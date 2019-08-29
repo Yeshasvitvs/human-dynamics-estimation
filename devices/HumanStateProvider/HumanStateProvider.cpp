@@ -181,14 +181,20 @@ public:
     std::vector<SegmentInfo> segments;
     std::vector<LinkPairInfo> linkPairs;
 
-    // Buffers
-    std::unordered_map<std::string, iDynTree::Rotation> linkRotationMatrices;
+    // Link wearable data buffers
     std::unordered_map<std::string, iDynTree::Transform> linkTransformMatrices;
+<<<<<<< devel
     std::unordered_map<std::string, iDynTree::Transform> linkTransformMatricesRaw;
     std::unordered_map<std::string, iDynTree::Rotation> linkOrientationMatrices;
+=======
+>>>>>>> Extract link acceleration from wearable data
     std::unordered_map<std::string, iDynTree::Twist> linkVelocities;
+    std::unordered_map<std::string, iDynTree::SpatialAcc> linkAccelerations;
+
+    // Accelerometer fbAcc and Orientation wearable  data buffers
     std::unordered_map<std::string, iDynTree::AngAcceleration> fbAccelerationMatrices;
     std::unordered_map<std::string, iDynTree::Rotation> sensorOrientationMatrices;
+
     iDynTree::VectorDynSize jointConfigurationSolution;
     iDynTree::VectorDynSize jointVelocitiesSolution;
     iDynTree::Transform baseTransformSolution;
@@ -269,8 +275,9 @@ public:
 
     // get input data
     bool getJointAnglesFromInputData(iDynTree::VectorDynSize& jointAngles);
-    bool getLinkTransformFromInputData(std::unordered_map<std::string, iDynTree::Transform>& t);
-    bool getLinkVelocityFromInputData(std::unordered_map<std::string, iDynTree::Twist>& t);
+    bool getLinkQuantitiesFromInputData(std::unordered_map<std::string, iDynTree::Transform>& t,
+                                        std::unordered_map<std::string, iDynTree::SpatialAcc>& linkAcc);
+    bool getLinkVelocityFromInputData(std::unordered_map<std::string, iDynTree::Twist>& t); //TODO: This should be removed and link velocity should be retrieved inside getLinkQuantitiesFromInputData
     bool getfbAccelerationFromInputData(std::unordered_map<std::string, iDynTree::AngAcceleration>& acc);
     bool getOrientationFromInputData(std::unordered_map<std::string, iDynTree::Rotation>& ori);
 
@@ -1250,7 +1257,11 @@ bool HumanStateProvider::close()
 void HumanStateProvider::run()
 {
     // Get the link transformations from input data
+<<<<<<< devel
     if (!pImpl->getLinkTransformFromInputData(pImpl->linkTransformMatricesRaw)) {
+=======
+    if (!pImpl->getLinkQuantitiesFromInputData(pImpl->linkTransformMatrices, pImpl->linkAccelerations)) {
+>>>>>>> Extract link acceleration from wearable data
         yError() << LogPrefix << "Failed to get link transforms from input data";
         askToStop();
         return;
@@ -1532,6 +1543,7 @@ void HumanStateProvider::run()
     //                                          pImpl->linkErrorAngularVelocities);
 }
 
+<<<<<<< devel
 void HumanStateProvider::impl::ereaseSecondaryCalibration(const std::string& linkName)
 {
     if (linkName != "") {
@@ -1660,6 +1672,11 @@ bool HumanStateProvider::impl::applyRpcCommand()
 
 bool HumanStateProvider::impl::getLinkTransformFromInputData(
     std::unordered_map<std::string, iDynTree::Transform>& transforms)
+=======
+bool HumanStateProvider::impl::getLinkQuantitiesFromInputData(
+    std::unordered_map<std::string, iDynTree::Transform>& transforms,
+    std::unordered_map<std::string, iDynTree::SpatialAcc>& linkAcc)
+>>>>>>> Extract link acceleration from wearable data
 {
     for (const auto& linkMapEntry : wearableStorage.modelToWearable_LinkName) {
         const ModelLinkName& modelLinkName = linkMapEntry.first;
@@ -1688,9 +1705,10 @@ bool HumanStateProvider::impl::getLinkTransformFromInputData(
             return false;
         }
 
+        // Get link transform from wearable data
         wearable::Vector3 position;
         if (!sensor->getLinkPosition(position)) {
-            yError() << LogPrefix << "Failed to read link position from virtual link sensor";
+            yError() << LogPrefix << "Failed to read link position from virtual link sensor " << wearableLinkName;
             return false;
         }
 
@@ -1698,7 +1716,7 @@ bool HumanStateProvider::impl::getLinkTransformFromInputData(
 
         Quaternion orientation;
         if (!sensor->getLinkOrientation(orientation)) {
-            yError() << LogPrefix << "Failed to read link orientation from virtual link sensor";
+            yError() << LogPrefix << "Failed to read link orientation from virtual link sensor " << wearableLinkName;
             return false;
         }
 
@@ -1710,7 +1728,27 @@ bool HumanStateProvider::impl::getLinkTransformFromInputData(
         // Note that this map is used during the IK step for setting a target transform to a
         // link of the model. For this reason the map keys are model names.
         transforms[modelLinkName] = std::move(transform);
+
+        // Get link acceleration from wearable data
+        wearable::Vector3 linkLinAcc;
+        wearable::Vector3 linkAngAcc;
+        if (!sensor->getLinkAcceleration(linkLinAcc, linkAngAcc)) {
+            yError() << LogPrefix << "Failed to read link acceleration from virtual link sensor " << wearableLinkName;
+            return false;
+        }
+
+        iDynTree::SpatialAcc linkSpaAcc;
+        linkSpaAcc.setVal(0, linkLinAcc.at(0));
+        linkSpaAcc.setVal(1, linkLinAcc.at(1));
+        linkSpaAcc.setVal(2, linkLinAcc.at(2));
+        linkSpaAcc.setVal(3, linkAngAcc.at(0));
+        linkSpaAcc.setVal(4, linkAngAcc.at(1));
+        linkSpaAcc.setVal(5, linkAngAcc.at(2));
+
+        linkAcc[modelLinkName] = std::move(linkSpaAcc);
+
     }
+
 
     return true;
 }
