@@ -223,7 +223,7 @@ public:
     bool useFBAccelerationFromWearableData;
     HumanSensorData humanSensorData;
 
-    std::array<double, 3> CoMProperAccelerationExpressedInBaseFrame;
+    std::array<double, 6> CoMProperAccelerationExpressedInBaseFrame;
     std::array<double, 6> CoMProperAccelerationExpressedInWorldFrame;
 
     // IK parameters
@@ -1128,7 +1128,7 @@ bool HumanStateProvider::open(yarp::os::Searchable& config)
     }
 
     // Initialize CoM proper acceleration to zero
-    pImpl->CoMProperAccelerationExpressedInBaseFrame = std::array<double, 3>{0.0, 0.0, 0.0};
+    pImpl->CoMProperAccelerationExpressedInBaseFrame = std::array<double, 6>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     pImpl->CoMProperAccelerationExpressedInWorldFrame = std::array<double, 6>{0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     // Debug Info
@@ -1671,7 +1671,10 @@ void HumanStateProvider::run()
 
             pImpl->CoMProperAccelerationExpressedInBaseFrame = {CoMProperAccelerationExpressedInBaseFrame.getVal(0),
                                                                 CoMProperAccelerationExpressedInBaseFrame.getVal(1),
-                                                                CoMProperAccelerationExpressedInBaseFrame.getVal(2)};
+                                                                CoMProperAccelerationExpressedInBaseFrame.getVal(2),
+                                                                0.0,
+                                                                0.0,
+                                                                0.0};
 
             pImpl->CoMProperAccelerationExpressedInWorldFrame = {comSpatialAccExpressedInWorld.getVal(0),
                                                                  comSpatialAccExpressedInWorld.getVal(1),
@@ -3291,7 +3294,7 @@ std::array<double, 3> HumanStateProvider::getCoMBiasAcceleration() const
     return pImpl->solution.CoMBiasAcceleration;
 }
 
-std::array<double, 3> HumanStateProvider::getCoMProperAccelerationExpressedInBaseFrame() const
+std::array<double, 6> HumanStateProvider::getCoMProperAccelerationExpressedInBaseFrame() const
 {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->CoMProperAccelerationExpressedInBaseFrame;
