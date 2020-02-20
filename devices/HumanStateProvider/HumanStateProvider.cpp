@@ -18,7 +18,8 @@
 #include <iDynTree/Sensors/AccelerometerSensor.h>
 #include <iDynTree/Core/EigenHelpers.h>
 #include <iDynTree/Model/Traversal.h>
-
+#include <iDynTree/Core/EigenHelpers.h>
+#include <iDynTree/Model/Traversal.h>
 
 #include <yarp/os/LogStream.h>
 #include <yarp/os/ResourceFinder.h>
@@ -165,12 +166,6 @@ public:
     float period;
     mutable std::mutex mutex;
 
-    // Rpc
-    class CmdParser;
-    std::unique_ptr<CmdParser> commandPro;
-    yarp::os::RpcServer rpcPort;
-    bool applyRpcCommand();
-
     // Wearable variables
     WearableStorage wearableStorage;
 
@@ -186,14 +181,13 @@ public:
     class CmdParser;
     std::unique_ptr<CmdParser> commandPro;
     yarp::os::RpcServer rpcPort;
+    bool applyRpcCommand();
 
     // Link wearable data buffers
+    std::unordered_map<std::string, iDynTree::Rotation> linkRotationMatrices;
     std::unordered_map<std::string, iDynTree::Transform> linkTransformMatrices;
-<<<<<<< devel
     std::unordered_map<std::string, iDynTree::Transform> linkTransformMatricesRaw;
     std::unordered_map<std::string, iDynTree::Rotation> linkOrientationMatrices;
-=======
->>>>>>> Extract link acceleration from wearable data
     std::unordered_map<std::string, iDynTree::Twist> linkVelocities;
     std::unordered_map<std::string, iDynTree::SpatialAcc> linkAccelerations;
 
@@ -331,7 +325,6 @@ public:
 
     // constructor
     impl();
-<<<<<<< devel
 };
 
 // ===============
@@ -342,6 +335,8 @@ class HumanStateProvider::impl::CmdParser : public yarp::os::PortReader
 {
 
 public:
+    std::array<std::atomic_bool,3> positionOffsetFlag{{ATOMIC_VAR_INIT(false), ATOMIC_VAR_INIT(false), ATOMIC_VAR_INIT(false)}};
+    std::array<std::atomic_bool,3> orientationOffsetFlag{{ATOMIC_VAR_INIT(false), ATOMIC_VAR_INIT(false), ATOMIC_VAR_INIT(false)}};
     std::atomic<bool> cmdStatus{false};
     std::atomic<bool> cmdErease{false};
     std::string parentLinkName;
@@ -362,12 +357,92 @@ public:
 
             if (command.get(0).asString() == "help") {
                 response.addVocab(yarp::os::Vocab::encode("many"));
+                response.addString("===================================================================================");
+                response.addString("The following commands can be used to remove the offset in base pose \n");
+                response.addString("Enter <removePositionOffset> to remove the base position offset from all the axis \n");
+                response.addString("Enter <removePositionOffset> <axis> <axis_list> for removing position offset of specific axis (e.g. 'removePositionOffset axis xy') \n");
+                response.addString("Enter <removeOrientationOffset> to remove the base orientation offset \n");
+                response.addString("Enter <removeOrientationOffset> <axis> <axis_list> for removing orientatino offset on specific axis \n");
+                response.addString("Enter <resetPositionOffset> to reset the base position \n");
+                response.addString("Enter <resetOrientationOffset> to reset the base orientation \n");
+                response.addString("Enter <resetOffset> to reset the base position and orientation");
+                response.addString("===================================================================================");
                 response.addString("The following commands can be used to apply a secondary calibration assuming the subject is in the zero configuration of the model for the calibrated links. \n");
                 response.addString("Enter <calibrate> to apply a secondary calibration for all the links \n");
                 response.addString("Enter <calibrate <linkName>> to apply a secondary calibration for the given link \n");
                 response.addString("Enter <calibrate <parentLinkName> <childLinkName>> to apply a secondary calibration for the given chain \n");
                 response.addString("Enter <reset <linkName>> to remove secondary calibration for the given link \n");
                 response.addString("Enter <reset> to remove all the secondary calibrations");
+            }
+            else if (command.get(0).asString() == "removePositionOffset") {
+                if (command.size() == 1) {
+                    response.addString("Entered command <removePositionOffset> is correct, removing position offset for all the axis");
+                    this->positionOffsetFlag.at(0) = true;
+                    this->positionOffsetFlag.at(1) = true;
+                    this->positionOffsetFlag.at(2) = true;
+                    this->cmdStatus = true;
+                }
+                else if (command.get(1).isString() && command.get(1).asString() == "axis" && command.get(2).isString()) {
+                    response.addString("Entered command <removePositionOffset> is correct, removing position offset for the selected axis");
+                    std::string axis = command.get(2).asString();
+                    if (axis.find('x')!=std::string::npos)
+                         this->positionOffsetFlag[0] = true;
+                    if (axis.find('y')!=std::string::npos)
+                         this->positionOffsetFlag[1] = true;
+                    if (axis.find('z')!=std::string::npos)
+                         this->positionOffsetFlag[2] = true;
+                    this->cmdStatus = true;
+                }
+                else {
+                    response.addString("Entered command is incorrect, Enter help to know available commands");
+                }
+            }
+            else if (command.get(0).asString() == "removeOrientationOffset") {
+                if (command.size() == 1) {
+                    response.addString("Entered command <removeOrientationOffset> is correct, removing orientation offset for all the axis");
+                    this->orientationOffsetFlag.at(0) = true;
+                    this->orientationOffsetFlag.at(1) = true;
+                    this->orientationOffsetFlag.at(2) = true;
+                    this->cmdStatus = true;
+                }
+                else if (command.get(1).isString() && command.get(1).asString() == "axis" && command.get(2).isString()) {
+                    response.addString("Entered command <removeOrientationOffset> is correct, removing orientation offset for the selected axis");
+                    std::string axis = command.get(2).asString();
+                    if (axis.find('x')!=std::string::npos)
+                         this->orientationOffsetFlag[0] = true;
+                    if (axis.find('y')!=std::string::npos)
+                         this->orientationOffsetFlag[1] = true;
+                    if (axis.find('z')!=std::string::npos)
+                         this->orientationOffsetFlag[2] = true;
+                    this->cmdStatus = true;
+                }
+                else {
+                    response.addString("Entered command is incorrect, Enter help to know available commands");
+                }
+            }
+            else if (command.get(0).asString() == "resetPositionOffset") {
+                response.addString("Entered command <resetPositionOffset> is correct, resetting the position offset");
+                this->positionOffsetFlag.at(0) = false;
+                this->positionOffsetFlag.at(1) = false;
+                this->positionOffsetFlag.at(2) = false;
+                this->cmdStatus = true;
+            }
+            else if (command.get(0).asString() == "resetOrientationOffset") {
+                response.addString("Entered command <resetOrientationOffset> is correct, resetting the orientation offset");
+                this->orientationOffsetFlag.at(0) = false;
+                this->orientationOffsetFlag.at(1) = false;
+                this->orientationOffsetFlag.at(2) = false;
+                this->cmdStatus = true;
+            }
+            else if (command.get(0).asString() == "resetOffset") {
+                response.addString("Entered command <resetOffset> is correct, resetting position and orientation offsets");
+                this->positionOffsetFlag.at(0) = false;
+                this->positionOffsetFlag.at(1) = false;
+                this->positionOffsetFlag.at(2) = false;
+                this->orientationOffsetFlag.at(0) = false;
+                this->orientationOffsetFlag.at(1) = false;
+                this->orientationOffsetFlag.at(2) = false;
+                this->cmdStatus = true;
             }
             else if (command.get(0).asString() == "calibrate" && !command.get(1).isNull() && !command.get(2).isNull()) {
                 this->parentLinkName = command.get(1).asString();
@@ -396,12 +471,12 @@ public:
                 this->cmdErease = true;
             }
             else {
-                response.addString(
-                    "Entered command is incorrect. Enter help to know available commands");
+                response.addString("Entered command is incorrect, Enter help to know available commands");
             }
         }
         else {
             resetInternalVariables();
+            this->cmdStatus = false;
             return false;
         }
 
@@ -421,140 +496,10 @@ public:
 // CONSTRUCTOR
 // ===========
 
-=======
-};
-
-// ===============
-// RPC PORT PARSER
-// ===============
-
-class HumanStateProvider::impl::CmdParser : public yarp::os::PortReader
-{
-
-public:
-    std::array<std::atomic_bool,3> positionOffsetFlag{{ATOMIC_VAR_INIT(false), ATOMIC_VAR_INIT(false), ATOMIC_VAR_INIT(false)}};
-    std::array<std::atomic_bool,3> orientationOffsetFlag{{ATOMIC_VAR_INIT(false), ATOMIC_VAR_INIT(false), ATOMIC_VAR_INIT(false)}};
-    std::atomic<bool> cmdStatus{false};
-
-    bool read(yarp::os::ConnectionReader& connection) override
-    {
-        yarp::os::Bottle command, response;
-        if (command.read(connection)) {
-
-            if (command.get(0).asString() == "help") {
-                response.addVocab(yarp::os::Vocab::encode("many"));
-                response.addString("Enter <removePositionOffset> to remove the base position offset from all the axis \n"
-                                   "   or <removePositionOffset> <axis> <axis_list> for removing position offset of specific axis (e.g. 'removePositionOffset axis xy') \n"
-                                   "Enter <removeOrientationOffset> to remove the base orientation offset \n"
-                                   "   or <removeOrientationOffset> <axis> <axis_list> for removing orientatino offset on specific axis \n"
-                                   "Enter <resetPositionOffset> to reset the base position \n"
-                                   "Enter <resetOrientationOffset> to reset the base orientation \n"
-                                   "Enter <resetOffset> to reset the base position and orientation"
-                                    );
-            }
-            else if (command.get(0).asString() == "removePositionOffset") {
-                if (command.size() == 1) {
-                    response.addString("Entered command <removePositionOffset> is correct, removing position offset for all the axis");
-                    this->positionOffsetFlag.at(0) = true;
-                    this->positionOffsetFlag.at(1) = true;
-                    this->positionOffsetFlag.at(2) = true;
-                    this->cmdStatus = true;
-                }
-                else if (command.get(1).isString() && command.get(1).asString() == "axis" && command.get(2).isString()) {
-                    response.addString("Entered command <removePositionOffset> is correct, removing position offset for the selected axis");
-                    std::string axis = command.get(2).asString();
-                    if (axis.find('x')!=std::string::npos)
-                         this->positionOffsetFlag[0] = true;
-                    if (axis.find('y')!=std::string::npos)
-                         this->positionOffsetFlag[1] = true;
-                    if (axis.find('z')!=std::string::npos)
-                         this->positionOffsetFlag[2] = true;
-                    this->cmdStatus = true;
-                }
-                else {
-                    response.addString(
-                        "Entered command is incorrect, Enter help to know available commands");
-                }
-            }
-            else if (command.get(0).asString() == "removeOrientationOffset") {
-                if (command.size() == 1) {
-                    response.addString("Entered command <removeOrientationOffset> is correct, removing orientation offset for all the axis");
-                    this->orientationOffsetFlag.at(0) = true;
-                    this->orientationOffsetFlag.at(1) = true;
-                    this->orientationOffsetFlag.at(2) = true;
-                    this->cmdStatus = true;
-                }
-                else if (command.get(1).isString() && command.get(1).asString() == "axis" && command.get(2).isString()) {
-                    response.addString("Entered command <removeOrientationOffset> is correct, removing orientation offset for the selected axis");
-                    std::string axis = command.get(2).asString();
-                    if (axis.find('x')!=std::string::npos)
-                         this->orientationOffsetFlag[0] = true;
-                    if (axis.find('y')!=std::string::npos)
-                         this->orientationOffsetFlag[1] = true;
-                    if (axis.find('z')!=std::string::npos)
-                         this->orientationOffsetFlag[2] = true;
-                    this->cmdStatus = true;
-                }
-                else {
-                    response.addString(
-                        "Entered command is incorrect, Enter help to know available commands");
-                }
-            }
-            else if (command.get(0).asString() == "resetPositionOffset") {
-                response.addString("Entered command <resetPositionOffset> is correct, resetting the position offset");
-                this->positionOffsetFlag.at(0) = false;
-                this->positionOffsetFlag.at(1) = false;
-                this->positionOffsetFlag.at(2) = false;
-                this->cmdStatus = true;
-            }
-            else if (command.get(0).asString() == "resetOrientationOffset") {
-                response.addString("Entered command <resetOrientationOffset> is correct, resetting the orientation offset");
-                this->orientationOffsetFlag.at(0) = false;
-                this->orientationOffsetFlag.at(1) = false;
-                this->orientationOffsetFlag.at(2) = false;
-                this->cmdStatus = true;
-            }
-            else if (command.get(0).asString() == "resetOffset") {
-                response.addString("Entered command <resetOffset> is correct, resetting position and orientation offsets");
-                this->positionOffsetFlag.at(0) = false;
-                this->positionOffsetFlag.at(1) = false;
-                this->positionOffsetFlag.at(2) = false;
-                this->orientationOffsetFlag.at(0) = false;
-                this->orientationOffsetFlag.at(1) = false;
-                this->orientationOffsetFlag.at(2) = false;
-                this->cmdStatus = true;
-            }
-            else {
-                response.addString(
-                    "Entered command is incorrect, Enter help to know available commands");
-            }
-        }
-        else {
-            this->cmdStatus = false;
-            return false;
-        }
-
-        yarp::os::ConnectionWriter* reply = connection.getWriter();
-
-        if (reply != NULL) {
-            response.write(*reply);
-        }
-        else
-            return false;
-
-        return true;
-    }
-};
-
->>>>>>> Add cmdParser name scoping
 HumanStateProvider::impl::impl()
     : commandPro(new CmdParser())
 {}
 
-<<<<<<< devel
-
-=======
->>>>>>> Add cmdParser name scoping
 // =========================
 // HUMANSTATEPROVIDER DEVICE
 // =========================
@@ -1021,37 +966,37 @@ bool HumanStateProvider::open(yarp::os::Searchable& config)
     yInfo() << LogPrefix << "*** Use Xsens joint angles                    :" << pImpl->useXsensJointsAngles;
     yInfo() << LogPrefix << "*** Use Directly base measurement             :" << pImpl->useDirectBaseMeasurement;
     if (pImpl->ikSolver == SolverIK::pairwised || pImpl->ikSolver == SolverIK::global) {
-        yInfo() << LogPrefix << "*** Allow IK failures                 :" << pImpl->allowIKFailures;
-        yInfo() << LogPrefix << "*** Max IK iterations                 :" << pImpl->maxIterationsIK;
-        yInfo() << LogPrefix << "*** Cost Tolerance                    :" << pImpl->costTolerance;
+        yInfo() << LogPrefix << "*** Allow IK failures                     :" << pImpl->allowIKFailures;
+        yInfo() << LogPrefix << "*** Max IK iterations                     :" << pImpl->maxIterationsIK;
+        yInfo() << LogPrefix << "*** Cost Tolerance                        :" << pImpl->costTolerance;
         yInfo() << LogPrefix
-                << "*** IK Solver Name                    :" << pImpl->linearSolverName;
-        yInfo() << LogPrefix << "*** Position target weight            :" << pImpl->posTargetWeight;
-        yInfo() << LogPrefix << "*** Rotation target weight            :" << pImpl->rotTargetWeight;
+                << "*** IK Solver Name                                     :" << pImpl->linearSolverName;
+        yInfo() << LogPrefix << "*** Position target weight                :" << pImpl->posTargetWeight;
+        yInfo() << LogPrefix << "*** Rotation target weight                :" << pImpl->rotTargetWeight;
         yInfo() << LogPrefix
-                << "*** Cost regularization              :" << pImpl->costRegularization;
-        yInfo() << LogPrefix << "*** Size of thread pool               :" << pImpl->ikPoolSize;
+                << "*** Cost regularization                                :" << pImpl->costRegularization;
+        yInfo() << LogPrefix << "*** Size of thread pool                   :" << pImpl->ikPoolSize;
     }
     if (pImpl->ikSolver == SolverIK::integrationbased) {
-        yInfo() << LogPrefix << "*** Measured Linear velocity gain     :"
+        yInfo() << LogPrefix << "*** Measured Linear velocity gain         :"
                 << pImpl->integrationBasedIKMeasuredLinearVelocityGain;
-        yInfo() << LogPrefix << "*** Measured Angular velocity gain    :"
+        yInfo() << LogPrefix << "*** Measured Angular velocity gain        :"
                 << pImpl->integrationBasedIKMeasuredAngularVelocityGain;
-        yInfo() << LogPrefix << "*** Linear correction gain            :"
+        yInfo() << LogPrefix << "*** Linear correction gain                :"
                 << pImpl->integrationBasedIKLinearCorrectionGain;
-        yInfo() << LogPrefix << "*** Angular correction gain           :"
+        yInfo() << LogPrefix << "*** Angular correction gain               :"
                 << pImpl->integrationBasedIKAngularCorrectionGain;
-        yInfo() << LogPrefix << "*** Linear integral correction gain   :"
+        yInfo() << LogPrefix << "*** Linear integral correction gain       :"
                 << pImpl->integrationBasedIKIntegralLinearCorrectionGain;
-        yInfo() << LogPrefix << "*** Angular integral correction gain  :"
+        yInfo() << LogPrefix << "*** Angular integral correction gain      :"
                 << pImpl->integrationBasedIKIntegralAngularCorrectionGain;
         yInfo() << LogPrefix
-                << "*** Cost regularization              :" << pImpl->costRegularization;
-        yInfo() << LogPrefix << "*** Joint velocity limit             :"
+                << "*** Cost regularization                                :" << pImpl->costRegularization;
+        yInfo() << LogPrefix << "*** Joint velocity limit                  :"
                 << pImpl->integrationBasedJointVelocityLimit;
     }
     if (pImpl->ikSolver == SolverIK::integrationbased || pImpl->ikSolver == SolverIK::global) {
-        yInfo() << LogPrefix << "*** Inverse Velocity Kinematics solver:"
+        yInfo() << LogPrefix << "*** Inverse Velocity Kinematics solver    :"
                 << pImpl->inverseVelocityKinematicsSolver;
     }
     yInfo() << LogPrefix << "*** ===========================================";
@@ -1384,26 +1329,6 @@ bool HumanStateProvider::open(yarp::os::Searchable& config)
         }
     }
 
-    // ===================
-    // INITIALIZE RPC PORT
-    // ===================
-
-    std::string rpcPortName;
-    if (!(config.check("rpcPortPrefix") && config.find("rpcPortPrefix").isString())) {
-        rpcPortName = "/" + DeviceName + "/rpc:i";
-    }
-    else {
-        rpcPortName = "/" + config.find("rpcPortPrefix").asString() + "/" + DeviceName + "/rpc:i";
-    }
-
-    if (!pImpl->rpcPort.open(rpcPortName)) {
-        yError() << LogPrefix << "Unable to open rpc port " << rpcPortName;
-        return false;
-    }
-
-    // Set rpc port reader
-    pImpl->rpcPort.setReader(*pImpl->commandPro);
-
     return true;
 }
 
@@ -1415,11 +1340,7 @@ bool HumanStateProvider::close()
 void HumanStateProvider::run()
 {
     // Get the link transformations from input data
-<<<<<<< devel
-    if (!pImpl->getLinkTransformFromInputData(pImpl->linkTransformMatricesRaw)) {
-=======
-    if (!pImpl->getLinkQuantitiesFromInputData(pImpl->linkTransformMatrices, pImpl->linkAccelerations)) {
->>>>>>> Extract link acceleration from wearable data
+    if (!pImpl->getLinkQuantitiesFromInputData(pImpl->linkTransformMatricesRaw, pImpl->linkAccelerations)) {
         yError() << LogPrefix << "Failed to get link transforms from input data";
         askToStop();
         return;
@@ -1714,6 +1635,7 @@ void HumanStateProvider::run()
 
         // CoM bias acceleration
         pImpl->solution.CoMBiasAcceleration = {CoM_biasacceleration[0], CoM_biasacceleration[1], CoM_biasacceleration[2]};
+
     }
 
     // Check for rpc command status and apply command
@@ -1730,19 +1652,6 @@ void HumanStateProvider::run()
             pImpl->commandPro->resetInternalVariables();
         }
     }
-
-    // compute the inverse kinematic errors (currently the result is unused, but it may be used for
-    // evaluating the IK performance)
-    // pImpl->computeLinksOrientationErrors(pImpl->linkTransformMatrices,
-    //                                      pImpl->jointConfigurationSolution,
-    //                                      pImpl->baseTransformSolution,
-    //                                      pImpl->linkErrorOrientations);
-    // pImpl->computeLinksAngularVelocityErrors(pImpl->linkVelocities,
-    //                                          pImpl->jointConfigurationSolution,
-    //                                          pImpl->baseTransformSolution,
-    //                                          pImpl->jointVelocitiesSolution,
-    //                                          pImpl->baseVelocitySolution,
-    //                                          pImpl->linkErrorAngularVelocities);
 
     // Check for rpc command status and update offsets
     if (pImpl->commandPro->cmdStatus) {
@@ -1776,7 +1685,6 @@ void HumanStateProvider::run()
     pImpl->commandPro->cmdStatus = false;
 }
 
-<<<<<<< devel
 void HumanStateProvider::impl::ereaseSecondaryCalibration(const std::string& linkName)
 {
     if (linkName != "") {
@@ -1903,13 +1811,10 @@ bool HumanStateProvider::impl::applyRpcCommand()
     }
 }
 
-bool HumanStateProvider::impl::getLinkTransformFromInputData(
-    std::unordered_map<std::string, iDynTree::Transform>& transforms)
-=======
+
 bool HumanStateProvider::impl::getLinkQuantitiesFromInputData(
     std::unordered_map<std::string, iDynTree::Transform>& transforms,
     std::unordered_map<std::string, iDynTree::SpatialAcc>& linkAcc)
->>>>>>> Extract link acceleration from wearable data
 {
     for (const auto& linkMapEntry : wearableStorage.modelToWearable_LinkName) {
         const ModelLinkName& modelLinkName = linkMapEntry.first;
@@ -2105,11 +2010,6 @@ bool HumanStateProvider::impl::getJointAnglesFromInputData(iDynTree::VectorDynSi
     return true;
 }
 
-<<<<<<< devel
-<<<<<<< devel
-bool HumanStateProvider::impl::createLinkPairs()
-=======
-=======
 bool HumanStateProvider::impl::getOrientationFromInputData(std::unordered_map<std::string, iDynTree::Rotation>& ori) {
 
     for (const auto& parentLinkMapEntry : wearableStorage.modelToWearable_SensorOrientationParentLinkName) {
@@ -2168,7 +2068,6 @@ bool HumanStateProvider::impl::getOrientationFromInputData(std::unordered_map<st
     return true;
 }
 
->>>>>>> Update HumanStatProvider to get orientation sensor values from wearable data and use it to compute proper acceleration
 bool HumanStateProvider::impl::getfbAccelerationFromInputData(std::unordered_map<std::string, iDynTree::AngAcceleration>& acc) {
 
     for (const auto& parentLinkMapEntry : wearableStorage.modelToWearable_AccelerometerParentLinkName) {
@@ -2216,8 +2115,7 @@ bool HumanStateProvider::impl::getfbAccelerationFromInputData(std::unordered_map
     return true;
 }
 
-bool HumanStateProvider::impl::initializePairwisedInverseKinematicsSolver()
->>>>>>> Update human state provider to get freebodyacceleration sensors configuration
+bool HumanStateProvider::impl::createLinkPairs()
 {
     // Get the model link names according to the modelToWearable link sensor map
     const size_t nrOfSegments = wearableStorage.modelToWearable_LinkName.size();
