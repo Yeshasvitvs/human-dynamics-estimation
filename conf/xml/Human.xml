@@ -18,8 +18,8 @@
     </device>
 
     <device type="human_state_provider" name="HumanStateProvider">
-        <param name="period">0.02</param>
-        <param name="urdf">humanSubject01_66dof.urdf</param>
+        <param name="period">0.01</param>
+        <param name="urdf">humanSubject02_66dof.urdf</param>
         <param name="floatingBaseFrame">(Pelvis, XsensSuit::vLink::Pelvis)</param>
         <!--Use none for Zero values, gravity for compensating gravity acceleration, proper for proper sensor acceleration-->
         <param name="accelerometerSensorMeasurementsOption">gravity</param>
@@ -233,7 +233,7 @@
 
     <device type="human_wrench_provider" name="HumanWrenchProvider">
         <param name="period">0.020</param>
-        <param name="human_urdf">humanSubject01_66dof.urdf</param>
+        <param name="human_urdf">humanSubject02_66dof.urdf</param>
         <param name="pHRIScenario">false</param>
         <param name="number_of_sources">4</param>
         <param name="sources">(FTShoeLeft FTShoeRight DummyLeftHand DummyRightHand)</param>
@@ -314,13 +314,13 @@
 
     <device type="human_dynamics_estimator" name="HumanDynamicsEstimator">
         <param name="period">0.02</param>
-        <param name="urdf">humanSubject01_66dof.urdf</param>
+        <param name="urdf">humanSubject02_66dof.urdf</param>
         <param name="baseLink">Pelvis</param>
         <param name="number_of_wrench_sensors">4</param>
         <param name="wrench_sensors_link_name">(LeftFoot RightFoot LeftHand RightHand)</param>
         <param name="comConstraintIncludeAllLinks">false</param>
         <param name="saveStateToFile">false</param>
-        <param name="removeOffsetOption">source</param>
+        <param name="removeOffsetOption">model</param>
         <param name="dynamicWrenchOffsetSD">30.0</param>
         <param name="wrenchEstimationForceLowerThreshold">10</param>
         <param name="expressDummyWrenchEstimatesInWorldOrientation">true</param>
@@ -331,7 +331,7 @@
            <param name="cov_measurements_ACCELEROMETER_SENSOR">(0.0011 0.0011 0.0011)</param>
            <param name="cov_measurements_THREE_AXIS_ANGULAR_ACCELEROMETER_SENSOR">(1e-3 1e-3 1e-3)</param>
            <param name="cov_measurements_DOF_ACCELERATION_SENSOR">0.666e-5</param>
-           <param name="cov_measurements_COM_ACCELEROMETER_SENSOR">(1e-2 1e-2 1e-2 1e-2 1e-2 1e-2)</param>
+           <param name="cov_measurements_COM_ACCELEROMETER_SENSOR">(1e-3 1e-3 1e-3 1e-3 1e-3 1e-3)</param>
            <group name="cov_measurements_NET_EXT_WRENCH_SENSOR">
                <param name="value">1e-6</param>
                <param name="specific_elements">(LeftFoot RightFoot LeftHand RightHand)</param>
@@ -438,7 +438,7 @@
 
     <!-- <device type="human_control_board" name="HumanControlBoard">
         <param name="period">0.100</param>
-        <param name="urdf">humanSubject01_66dof.urdf</param>
+        <param name="urdf">humanSubject02_66dof.urdf</param>
         <action phase="startup" level="5" type="attach">
             <paramlist name="networks">
                 <elem name="HumanControlBoardLabel1">HumanStateProvider</elem>
