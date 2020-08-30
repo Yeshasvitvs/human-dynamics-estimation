@@ -1520,7 +1520,7 @@ void HumanStateProvider::computeROCMInBaseUsingMeasurements()
         {
 
             // compute L_v_B,L = (L_X_A * A_v_A,L) - (L_X_B * B_X_A * A_v_A,B)
-            // from Eq (3.5a) from silvio's thesis https://traversaro.github.io/phd-thesis/traversaro-phd-thesis.pdf
+            // from Eq (3.4a) from silvio's thesis https://traversaro.github.io/phd-thesis/traversaro-phd-thesis.pdf
             iDynTree::Vector6 linkVelocityExpressedInBody;
             linkVelocityExpressedInBody.zero();
 
@@ -1528,8 +1528,8 @@ void HumanStateProvider::computeROCMInBaseUsingMeasurements()
                                                              (iDynTree::toEigen(world_H_link.inverse().asAdjointTransform()) * iDynTree::toEigen(baseVelocityExpressedInWorld));
 
 
-            // Compute A_a_B,L = (L_X_A * A_a_A,L) - (L_X_B * B_X_A * A_a_A,B) - (L_X_A * A_v_A,B * L_v_B,L)
-            // from Eq (3.5b) from silvio's thesis https://traversaro.github.io/phd-thesis/traversaro-phd-thesis.pdf
+            // Compute L_a_B,L = (L_X_A * A_a_A,L) - (L_X_B * B_X_A * A_a_A,B) - (L_X_A * A_v_A,B * L_v_B,L)
+            // from Eq (3.4b) from silvio's thesis https://traversaro.github.io/phd-thesis/traversaro-phd-thesis.pdf
             iDynTree::Vector6 linkAccelerationExpressedInBody;
             linkAccelerationExpressedInBody.zero();
 
@@ -1741,12 +1741,12 @@ void HumanStateProvider::run()
         std::lock_guard<std::mutex> lock(pImpl->mutex);
 
         // Compute and set the rate of change of momentum expressed in base to be used as the new measurement input for centroidal dynamics expressed in base
-        pImpl->rateOfChangeOfMomentumInBaseFrame = {pImpl->computedRateOfChangeOfMomentumInBase[0] - pImpl->biasTermFromCentroidalMomentum.getVal(0) - pImpl->gravitationalWrenchInBase.getVal(0),
-                                                    pImpl->computedRateOfChangeOfMomentumInBase[1] - pImpl->biasTermFromCentroidalMomentum.getVal(1) - pImpl->gravitationalWrenchInBase.getVal(1),
-                                                    pImpl->computedRateOfChangeOfMomentumInBase[2] - pImpl->biasTermFromCentroidalMomentum.getVal(2) - pImpl->gravitationalWrenchInBase.getVal(2),
-                                                    pImpl->computedRateOfChangeOfMomentumInBase[3] - pImpl->biasTermFromCentroidalMomentum.getVal(3) - pImpl->gravitationalWrenchInBase.getVal(3),
-                                                    pImpl->computedRateOfChangeOfMomentumInBase[4] - pImpl->biasTermFromCentroidalMomentum.getVal(4) - pImpl->gravitationalWrenchInBase.getVal(4),
-                                                    pImpl->computedRateOfChangeOfMomentumInBase[5] - pImpl->biasTermFromCentroidalMomentum.getVal(5) - pImpl->gravitationalWrenchInBase.getVal(5)};
+        pImpl->rateOfChangeOfMomentumInBaseFrame = {pImpl->computedRateOfChangeOfMomentumInBase[0] - pImpl->biasTermFromCentroidalMomentum.getVal(0),
+                                                    pImpl->computedRateOfChangeOfMomentumInBase[1] - pImpl->biasTermFromCentroidalMomentum.getVal(1),
+                                                    pImpl->computedRateOfChangeOfMomentumInBase[2] - pImpl->biasTermFromCentroidalMomentum.getVal(2),
+                                                    pImpl->computedRateOfChangeOfMomentumInBase[3] - pImpl->biasTermFromCentroidalMomentum.getVal(3),
+                                                    pImpl->computedRateOfChangeOfMomentumInBase[4] - pImpl->biasTermFromCentroidalMomentum.getVal(4),
+                                                    pImpl->computedRateOfChangeOfMomentumInBase[5] - pImpl->biasTermFromCentroidalMomentum.getVal(5)};
     }
 
     // CoM position and velocity

@@ -2073,6 +2073,10 @@ void HumanDynamicsEstimator::run()
         }
     }
 
+    // Set center of mass position for task 1 bias vector
+    iDynTree::Position comPos = kinDynComputations.getCenterOfMassPosition();
+    pImpl->berdyData.helper.setCoMPosition(comPos);
+
     // Update estimator information
     pImpl->berdyData.solver->updateEstimateInformationFloatingBase(baseTransform,
                                                                    pImpl->berdyData.state.jointsPosition,
