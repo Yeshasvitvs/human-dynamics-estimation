@@ -2075,8 +2075,57 @@ void HumanDynamicsEstimator::run()
 
     }
 
-    // Call wrench smoothing with vector of input wrench values from HumanWrenchProvider
-    wrenchSmoothing(correctedWrenchValues);
+    // Call wrench smoothing with vector of corrected wrench values
+    //wrenchSmoothing(correctedWrenchValues);
+
+    // New Wrench Correction
+    std::vector<double> newCorrectedWrenchValues(wrenchValues.size(), 0.0);
+    int e3[3] = {0, 0, 1};
+
+    for (size_t i = 0; i < pImpl->wrenchSensorsLinkNames.size(); i++) {
+
+        std::string linkName = pImpl->wrenchSensorsLinkNames.at(i);
+
+        iDynTree::Rotation w_R_ffx(kinDynComputations.getWorldTransform(pImpl->humanModel.getLinkIndex(linkName)).getRotation());
+
+        auto cosBeta = w_R_ffx.getVal(2,2);
+        auto sinBeta = std::sqrt(1-(std::pow(cosBeta, 2)));
+
+        iDynTree::Rotation ffx_R_s(cosBeta, 0, sinBeta,
+                                   0,       1, 0,
+                                  -sinBeta, 0, cosBeta);
+
+        iDynTree::Transform t = iDynTree::Transform::Identity();
+        t.setRotation(ffx_R_s);
+
+        iDynTree::Wrench inputWrench;
+
+        // TODO: Clean up this wrench handling
+        for (size_t e = 0; e < 6; e++) {
+            inputWrench.setVal(e, wrenchValues.at(6 * i + e));
+        }
+
+        Eigen::Matrix<double,6,1> newCorrectedWrenchEigen;
+        newCorrectedWrenchEigen = iDynTree::toEigen(t.inverse().asAdjointTransformWrench()) * iDynTree::toEigen(inputWrench);
+
+        // Set corrected wrench values buffer
+        for (size_t e = 0; e < 6; e++) {
+            newCorrectedWrenchValues.at(6 * i + e) = newCorrectedWrenchEigen[e];
+        }
+
+    }
+
+    // Call wrench smoothing with vector of new corrected wrench values
+    //wrenchSmoothing(newCorrectedWrenchValues);
+
+    wrenchSmoothing(wrenchValues);
+
+//    // Find the differerence between the previous corrected wrenches and the new corrected wrenches
+//    yInfo() << "Wrench difference";
+//    for (size_t i = 0; i < wrenchValues.size(); i++) {
+//        std::cout <<  correctedWrenchValues.at(i) - newCorrectedWrenchValues.at(i) << " ";
+//    }
+//    std::cout << std::endl;
 
     // Express task 1 measured wrench in different frames
     expressWrenchInDifferentFrames(pImpl->smoothedWrenchValues,
