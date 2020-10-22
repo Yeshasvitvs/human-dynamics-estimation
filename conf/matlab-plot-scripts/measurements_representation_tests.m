@@ -16,7 +16,7 @@ velLegendString = ["$v_x$", "$v_y$", "$v_z$","${\omega}_x$", "${\omega}_y$", "${
 baseLinkName  = 'Pelvis';
 baseLinkIndex = find(strcmp(linkNames, baseLinkName)); 
 
-HandLinkName  = 'RightHand';
+HandLinkName  = 'Pelvis';
 HandLinkIndex = find(strcmp(linkNames, HandLinkName)); 
 
 linkMeasurementsInworld = [];

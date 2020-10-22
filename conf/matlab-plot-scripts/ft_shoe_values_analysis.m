@@ -10,7 +10,7 @@ lineWidth = 3;
 wrenchLegendString = ["$f_x [N]$", "$f_y [N]$", "$f_z [N]$","$m_x [Nm]$", "$m_y [Nm]$", "$m_z [Nm]$"];
 
 
-dataPath     = "/home/yeshi/dumper/ft_without_insitu_5kg/";
+dataPath     = "/home/yeshi/dumper/ft/";
 ftShoe       = "ftShoe_left";
 ftShoe_front = "_front";
 ftShoe_rear  = "_rear";
@@ -69,6 +69,7 @@ plot(ftShoe_rear_data_norm, 'LineWidth', lineWidth);
 hold on;
 plot(ftShoe_data_norm, 'LineWidth', lineWidth, 'LineStyle', '--');
 hold on;
+xlabel('Samples', 'FontSize', fontSize);
 legend('Front', 'Rear', 'Shoe',...
            'FontSize', fontSize, 'Location', 'Best');
        

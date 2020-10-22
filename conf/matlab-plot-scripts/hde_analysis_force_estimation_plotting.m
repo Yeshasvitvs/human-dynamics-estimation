@@ -74,7 +74,7 @@ for s = 1:6
     subplot(2,3,s);
     plot( RateOfChangeOfMomentumInBaseFrame(s,:)',  'Color', bonecolors(120,:), 'LineWidth', lineWidth);
     hold on;
-    plot(sumWrenchMeasurementsInBaseFrame(:,s), 'Color', summercolors(120,:), 'LineWidth', lineWidth, 'LineStyle', '--');
+    plot(sumWrenchMeasurementsInBaseFrame(:,s), 'Color', summercolors(120,:), 'LineWidth', lineWidth);
     hold on;
 %     ylim([-400 1000])
     xlabel('Samples', 'FontSize', fontSize);
@@ -130,9 +130,45 @@ t.FontSize = fontSize;
 a.Visible = 'off' ;
 t.Visible = 'on' ;
 
+%% Centroidal Dynamics Constraints inputs difference
+fH = figure('units','normalized','outerposition',[0 0 1 1]);
 
-sumOfWrenchMeasurementsInBaseNorm = [];
-sumOfWrenchEstimatesInBaseNorm    = [];
+CDCInputMeausurementsDifference = RateOfChangeOfMomentumInBaseFrame' - sumWrenchMeasurementsInBaseFrame;
+
+CDCInputMeausurementsDifferenceNorm = [];
+
+
+for i=1:size(CDCInputMeausurementsDifference, 1)
+    CDCInputMeausurementsDifferenceNorm(i) = norm(CDCInputMeausurementsDifference(i,1:3));
+end
+
+
+for s = 1:6
+    
+    subplot(2,3,s);
+    plot(CDCInputMeausurementsDifference(:,s), 'Color', pinkcolors(80,:), 'LineWidth', lineWidth);
+    hold on;
+%     ylim([-400 1000])
+    xlabel('Samples', 'FontSize', fontSize);
+    legend( 'Inputs Difference',...
+           'Interpreter', 'latex', 'FontSize', fontSize, 'Location', 'Best');
+    
+end
+
+a = axes;
+t = title ("Difference of Rate of Change of Momentum & Sum of External Wrenches Measurements In Base Frame");
+t.FontSize = fontSize;
+a.Visible = 'off' ;
+t.Visible = 'on' ;
+
+fH = figure('units','normalized','outerposition',[0 0 1 1]);
+plot(CDCInputMeausurementsDifferenceNorm, 'Color', pinkcolors(120,:), 'LineWidth', lineWidth);
+title ("Norm of Difference of Rate of Change of Momentum & Sum of External Wrenches Measurements In Base Frame");
+
+
+sumOfWrenchMeasurementsInBaseNorm     = [];
+sumOfWrenchEstimatesInBaseNorm        = [];
+RateOfChangeOfMomentumInBaseFrameNorm = [];
 
 for i=1:size(sumWrenchMeasurementsInBaseFrame, 1)
     sumOfWrenchMeasurementsInBaseNorm(i) = norm(sumWrenchMeasurementsInBaseFrame(i,1:3));
@@ -142,6 +178,11 @@ for i=1:size(sumWrenchEstimatesInBaseFrame, 1)
     sumOfWrenchEstimatesInBaseNorm(i) = norm(sumWrenchEstimatesInBaseFrame(i,1:3));
 end
 
+for i=1:size(RateOfChangeOfMomentumInBaseFrame', 1)
+    RateOfChangeOfMomentumInBaseFrameNorm(i) = norm(RateOfChangeOfMomentumInBaseFrame(1:3,i));
+end
+
+
 %%  Sum of force measurements and estimates norm
 fH = figure('units','normalized','outerposition',[0 0 1 1]);
 
@@ -150,8 +191,10 @@ plot( sumOfWrenchMeasurementsInBaseNorm,  'Color', autumncolors(80,:), 'LineWidt
 hold on;
 plot(sumOfWrenchEstimatesInBaseNorm, 'Color', wintercolors(160,:), 'LineWidth', lineWidth, 'LineStyle', '--');
 hold on;
+plot(RateOfChangeOfMomentumInBaseFrameNorm, 'Color', parulacolors(60,:), 'LineWidth', lineWidth, 'LineStyle', '-.');
+hold on;
 xlabel('Samples', 'FontSize', fontSize);
-legend('Norm of Sum of force measurements', 'Norm of Sum of force estimates', ...
+legend('Norm of Sum of force measurements', 'Norm of Sum of force estimates', 'Norm of ROCM In Base', ...
        'Interpreter', 'latex', 'FontSize', fontSize, 'Location', 'Best');
 
 subplot(2,1,2)
@@ -224,8 +267,10 @@ plot( sumOfHandsWrenchMeasurementsInBaseNorm,  'Color', autumncolors(80,:), 'Lin
 hold on;
 plot(sumOfHandsWrenchEstimatesInBaseNorm, 'Color', wintercolors(160,:), 'LineWidth', lineWidth, 'LineStyle', '--');
 hold on;
+plot(CDCInputMeausurementsDifferenceNorm, 'Color', pinkcolors(120,:), 'LineWidth', lineWidth, 'LineStyle', '-.');
+hold on;
 xlabel('Samples', 'FontSize', fontSize);
-legend('Norm of Sum of hands force measurements', 'Norm of Sum of hands force estimates', ...
+legend('Norm of Sum of hands force measurements', 'Norm of Sum of hands force estimates', 'CDC InputMeausurementsDifferenceNorm',...
        'Interpreter', 'latex', 'FontSize', fontSize, 'Location', 'Best');
 
 subplot(2,1,2)

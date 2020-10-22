@@ -156,7 +156,7 @@ for i = 1:numberOfWrenchSources
     t.Visible = 'on' ;
     
     %% Save figure
-    save2pdf(strcat(t.String + ".pdf"), fH,300);
+% %     save2pdf(strcat(t.String + ".pdf"), fH,300);
     
 end
 
