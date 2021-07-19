@@ -34,6 +34,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <numeric>
 
 #include "Utils.hpp"
 
@@ -76,11 +77,7 @@ using WearableJointName = std::string;
 
 using InverseVelocityKinematicsSolverName = std::string;
 
-struct FloatingBaseName
-{
-    std::string model;
-    std::string wearable;
-};
+using FloatingBaseName = std::string;
 
 struct WearableJointInfo
 {
@@ -186,6 +183,7 @@ public:
     std::unordered_map<std::string, iDynTree::Twist> linkVelocities;
     std::unordered_map<std::string, iDynTree::SpatialAcc> linkAccelerations;
 
+    std::unordered_map<std::string, iDynTree::Transform> linkTransformMatricesRaw;
     std::unordered_map<std::string, iDynTree::Transform> linkTransformMatricesMeasured;
     std::unordered_map<std::string, iDynTree::Twist> linkVelocitiesMeasured;
     std::unordered_map<std::string, iDynTree::Twist> linkVelocitiesMeasuredInWorld;
@@ -278,7 +276,11 @@ public:
 
     SolverIK ikSolver;
 
+    std::vector<std::string> jointList;
+
+    // flags
     bool useDirectBaseMeasurement;
+    bool useFixedBase;
 
     iDynTree::InverseKinematics globalIK;
     InverseVelocityKinematics inverseVelocityKinematics;
@@ -299,6 +301,7 @@ public:
     bool getJointAnglesFromInputData(iDynTree::VectorDynSize& jointAngles);
     bool getLinkQuantitiesFromInputData(std::unordered_map<std::string, iDynTree::Transform>& t,
                                         std::unordered_map<std::string, iDynTree::SpatialAcc>& linkAcc);
+    bool computeRelativeTransformForInputData(std::unordered_map<std::string, iDynTree::Transform>& t);
     bool getLinkVelocityFromInputData(std::unordered_map<std::string, iDynTree::Twist>& t); //TODO: This should be removed and link velocity should be retrieved inside getLinkQuantitiesFromInputData
     bool getfbAccelerationFromInputData(std::unordered_map<std::string, iDynTree::AngAcceleration>& acc);
     bool getOrientationFromInputData(std::unordered_map<std::string, iDynTree::Rotation>& ori);
@@ -498,11 +501,43 @@ bool HumanStateProvider::open(yarp::os::Searchable& config)
         return false;
     }
 
-    if (!(config.check("floatingBaseFrame") && config.find("floatingBaseFrame").isList()
-          && config.find("floatingBaseFrame").asList()->size() == 2)) {
-        yError() << LogPrefix << "floatingBaseFrame option not found or not valid";
-        return false;
-    }
+    if (!(config.check("jointList") && config.find("jointList").isList())) {
+            yInfo() << LogPrefix << "jointList option not found or not valid, all the model joints are selected.";
+            pImpl->jointList.clear();
+        }
+        else
+        {
+            auto jointListBottle = config.find("jointList").asList();
+            for (size_t it = 0; it < jointListBottle->size(); it++)
+            {
+                pImpl->jointList.push_back(jointListBottle->get(it).asString());
+            }
+        }
+
+        std::string baseFrameName;
+        if(config.check("floatingBaseFrame") && config.find("floatingBaseFrame").isList() ) {
+                  baseFrameName = config.find("floatingBaseFrame").asList()->get(0).asString();
+                  pImpl->useFixedBase = false;
+                  yWarning() << LogPrefix << "'floatingBaseFrame' configuration option as list is deprecated. Please use a string with the model base name only.";
+        }
+        else if(config.check("floatingBaseFrame") && config.find("floatingBaseFrame").isString() ) {
+                  baseFrameName = config.find("floatingBaseFrame").asString();
+                  pImpl->useFixedBase = false;
+        }
+        else if(config.check("fixedBaseFrame") && config.find("fixedBaseFrame").isList() ) {
+                  baseFrameName = config.find("fixedBaseFrame").asList()->get(0).asString();
+                  pImpl->useFixedBase = true;
+                  yWarning() << LogPrefix << "'fixedBaseFrame' configuration option as list is deprecated. Please use a string with the model base name only.";
+        }
+        else if(config.check("fixedBaseFrame") && config.find("fixedBaseFrame").isString() ) {
+                  baseFrameName = config.find("fixedBaseFrame").asString();
+                  pImpl->useFixedBase = true;
+        }
+        else {
+            yError() << LogPrefix << "BaseFrame option not found or not valid";
+            return false;
+        }
+
 
     // Parse MODEL_TO_DATA_LINK_NAMES
     yarp::os::Bottle& linksGroup = config.findGroup("MODEL_TO_DATA_LINK_NAMES");
@@ -1306,6 +1341,17 @@ bool HumanStateProvider::open(yarp::os::Searchable& config)
         }
     }
 
+
+    // set base velocity constraint to zero if the base is fixed
+    if (pImpl->useFixedBase) {
+        pImpl->baseVelocityLowerLimit.resize(6);
+        pImpl->baseVelocityLowerLimit.zero();
+        pImpl->baseVelocityUpperLimit.resize(6);
+        pImpl->baseVelocityUpperLimit.zero();
+
+        yInfo() << "Using fixed base model, base velocity limits are set to zero";
+    }
+
     // check sizes
     if (pImpl->custom_jointsVelocityLimitsNames.size()
         != pImpl->custom_jointsVelocityLimitsValues.size()) {
@@ -1609,6 +1655,30 @@ void HumanStateProvider::computeROCMInBaseUsingMeasurements()
 
 }
 
+// In case it occurs that:
+// - Fixed-base is used for human-state-provider
+// - a sensor is associated with the fixed base frame
+// then we use the relative transform between the sensors and the base frame sensors
+bool HumanStateProvider::impl::computeRelativeTransformForInputData(
+    std::unordered_map<std::string, iDynTree::Transform>& transforms)
+{
+    // if the there is a measurement for the floating base,
+    // use the relative transform for the other sensors measurement
+    if (transforms.find(floatingBaseFrame) != transforms.end())
+    {
+        iDynTree::Rotation baseFrameRotationInverse = transforms[floatingBaseFrame].getRotation().inverse();
+        for (const auto& linkMapEntry : wearableStorage.modelToWearable_LinkName) {
+            const ModelLinkName& modelLinkName = linkMapEntry.first;
+
+            iDynTree::Rotation rotation = baseFrameRotationInverse * transforms[modelLinkName].getRotation();
+            transforms[modelLinkName].setRotation(rotation);
+        }
+    }
+
+    return true;
+}
+
+
 void HumanStateProvider::run()
 {
     // Get the link transformations from input data
@@ -1617,6 +1687,17 @@ void HumanStateProvider::run()
         askToStop();
         return;
     }
+
+    // Get the link transformations from input data
+if (pImpl->useFixedBase)
+{
+    if (!pImpl->computeRelativeTransformForInputData(pImpl->linkTransformMatricesRaw)) {
+        yError() << LogPrefix << "Failed to compute relative link transforms";
+        askToStop();
+        return;
+    }
+}
+
 
     if (!pImpl->getLinkQuantitiesFromInputData(pImpl->linkTransformMatricesMeasured, pImpl->linkAccelerationsMeasured)) {
         yError() << LogPrefix << "Failed to get link transforms from input data";
